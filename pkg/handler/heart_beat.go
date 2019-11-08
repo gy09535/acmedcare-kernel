@@ -26,15 +26,16 @@ func (manager *HeartBeatManager) Monitor() {
 		rpc.Logger.Println("get service info error:" + err.Error())
 	}
 
-	manager.heartBeat.ServiceName = serviceInfo.Name
-	manager.heartBeat.Ip = serviceInfo.Ip
-	service := proto.Service{Name: serviceInfo.Name, Ip: serviceInfo.Ip, Port: serviceInfo.Por}
-	manager.controlCenterClient.RegisterService(service)
+	if serviceInfo != nil {
+		manager.heartBeat.ServiceName = serviceInfo.Name
+		manager.heartBeat.Ip = serviceInfo.Ip
+		service := proto.Service{Name: serviceInfo.Name, Ip: serviceInfo.Ip, Port: serviceInfo.Por}
+		manager.controlCenterClient.RegisterService(service)
+	}
 	if err != nil {
 		rpc.Logger.Println("get service error")
 	}
 
-	rpc.Logger.Println("begin get health check")
 	go func() {
 		for {
 			select {
@@ -53,6 +54,10 @@ func (manager *HeartBeatManager) Monitor() {
 				} else {
 					manager.heartBeat.FailCount++
 				}
+
+				if manager.heartBeat.FailCount > 10 {
+
+				}
 				break
 			case <-manager.healthCheckChannel:
 				return
@@ -68,11 +73,19 @@ func (manager *HeartBeatManager) StartReport() {
 			select {
 			case <-time.After(time.Minute):
 
-				rpc.Logger.Println("send heart beat from service:" + manager.heartBeat.ServiceName)
-				manager.controlCenterClient.ReportHeartBeat(manager.heartBeat)
+				rpc.Logger.Println("report heart beat from service:" + manager.heartBeat.ServiceName + " to control center")
+				service, err := manager.controlClient.GetServiceInfo()
+				if err != nil {
+					rpc.Logger.Println("get service info error:" + err.Error())
+				}
+
+				manager.heartBeat.ServiceName = service.Name
+				manager.heartBeat.Ip = service.Ip
 				manager.heartBeat.CurrentTime = time.Now().Unix()
+				manager.controlCenterClient.ReportHeartBeat(manager.heartBeat)
 				manager.heartBeat.SuccessCount = 0
 				manager.heartBeat.FailCount = 0
+
 				break
 			case <-manager.reportChannel:
 				return

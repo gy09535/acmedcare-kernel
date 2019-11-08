@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"os/exec"
@@ -32,14 +33,18 @@ var heartBeatManager *handler.HeartBeatManager = nil
 
 func Start() {
 
-	logfile, err := getLogger();
-	rpc.Logger = log.New(logfile, "\r\n", log.Ldate|log.Ltime|log.Llongfile)
+	f, err := getLogger();
+	writers := []io.Writer{
+		f,
+		os.Stdout}
+	fileAndStdoutWriter := io.MultiWriter(writers...)
+	rpc.Logger = log.New(fileAndStdoutWriter, "\r\n", log.Ldate|log.Ltime|log.Llongfile)
 	if err != nil {
 		fmt.Printf("create log file error,%s\r\n", err.Error())
 		os.Exit(1)
 	}
 
-	defer logfile.Close()
+	defer f.Close()
 	StartService()
 	defer centerClient.Close()
 	if centerClient != nil {

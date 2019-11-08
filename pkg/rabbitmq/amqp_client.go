@@ -15,10 +15,12 @@ type AmqpClient struct {
 	topics         string
 	nodes          string
 	receiveChannel chan int
+	reConnChannel  chan int
 }
 
 func (amqpClient *AmqpClient) Init(address string) (err error) {
 
+	amqpClient.reConnChannel = make(chan int)
 	amqpClient.Close()
 	amqpClient.conn, err = amqp.Dial(address)
 	if err != nil {
@@ -31,6 +33,31 @@ func (amqpClient *AmqpClient) Init(address string) (err error) {
 		return err
 	}
 
+	go func() {
+		// retry connection
+		for {
+			single := <-amqpClient.reConnChannel
+			if single == 1 {
+				conn, err1 := amqp.Dial(address)
+				if err1 != nil {
+					rpc.Logger.Println("retry connect rabbitmq error:" + err1.Error())
+					continue
+				}
+
+				if amqpClient.conn != nil && !amqpClient.conn.IsClosed() {
+					_ := amqpClient.conn.Close()
+				}
+
+				amqpClient.conn = conn
+				amqpClient.channel, err1 = amqpClient.conn.Channel()
+				if err1 != nil {
+					rpc.Logger.Println("open channel for rabbitmq error:" + err1.Error())
+				}
+			} else {
+				return
+			}
+		}
+	}()
 	return nil
 }
 
@@ -110,6 +137,11 @@ func (amqpClient *AmqpClient) Receive(topic, route string, queue string, reader 
 				messages, err := amqpClient.channel.Consume(queue, "", true, false, false, false, nil)
 				if err != nil {
 					rpc.Logger.Printf("receive msg from control center error,%s\r\n", err.Error())
+					err = amqpClient.Ping()
+					if err != nil {
+						rpc.Logger.Println("ping rabbitmq error:" + err.Error())
+						amqpClient.reConnChannel <- 1
+					}
 				}
 
 				for d := range messages {
@@ -138,6 +170,10 @@ func (amqpClient *AmqpClient) Close() {
 
 	if amqpClient.receiveChannel != nil {
 		amqpClient.receiveChannel <- 1
+	}
+
+	if amqpClient.reConnChannel != nil {
+		amqpClient.reConnChannel <- 2
 	}
 }
 
