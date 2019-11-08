@@ -1,0 +1,35 @@
+syntax = "proto3";
+
+option java_multiple_files = true;
+option java_package = " com.acmedcare.framework.devops.endpoint.center";
+option java_outer_classname = "DevOpsProto";
+
+package  com.acmedcare.framework.devops.endpoint.center;
+
+// The greeting service definition.
+service ControllerCenter {
+  // Sends a greeting
+  rpc registerService (Service) returns (Result) {}
+
+  rpc reportHeartBeat (HeartBeat) returns (Result) {}
+
+}
+
+message HeartBeat{
+    string serviceName=1;
+    int32 successCount=2;
+    int32 failCount=3;
+    string ip=4;
+    int64 currentTime=5;
+}
+
+message Result {
+  	bool success=1;
+  	string data=2;
+}
+
+message Service {
+    string name=1;
+    string ip=2;
+    string port=3;
+}

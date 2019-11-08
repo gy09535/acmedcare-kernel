@@ -1,0 +1,33 @@
+syntax = "proto3";
+
+option java_multiple_files = true;
+option java_package = "com.acmedcare.framework.starter.control.protobuf";
+option java_outer_classname = "DevOpsProto";
+
+package com.acmedcare.framework.starter.control.protobuf;
+
+// The greeting service definition.
+service DevOpsController {
+  // Sends a greeting
+  rpc check (RequestDto) returns (ResultDto) {}
+
+  rpc start (RequestDto) returns (ResultDto) {}
+
+  rpc stop (RequestDto) returns (ResultDto) {}
+
+  rpc getInfo (RequestDto) returns (ServiceDto) {}
+}
+
+message RequestDto{
+    string data=1;
+}
+
+message ResultDto {
+  	bool success=1;
+}
+
+message ServiceDto {
+    string name=1;
+    string ip=2;
+    string por=3;
+}
