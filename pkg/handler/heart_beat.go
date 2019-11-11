@@ -44,10 +44,10 @@ func (manager *HeartBeatManager) Monitor() {
 			select {
 			case <-time.After(time.Second * 10):
 
-				rpc.Logger.Println("begin get heart beat")
+				rpc.Logger.Println("begin get heartbeat")
 				serviceBeat, err := manager.controlClient.GetHeartBeat()
 				if err != nil {
-					rpc.Logger.Println("get heart beat error:" + err.Error())
+					rpc.Logger.Println("get heartbeat error:" + err.Error())
 					manager.heartBeat.FailCount++
 					sendFailCount++
 					if sendFailCount > 10 {
@@ -79,12 +79,12 @@ func (manager *HeartBeatManager) StartReport() {
 		for {
 			select {
 			case <-time.After(time.Minute):
-				rpc.Logger.Println("report heart beat from service:" + manager.heartBeat.ServiceName + " to control center")
+				rpc.Logger.Println("report heartbeat from service:" + manager.heartBeat.ServiceName + " to control center")
 				service, err := manager.controlClient.GetServiceInfo()
 				_, err = manager.controlCenterClient.ReportHeartBeat(manager.heartBeat)
 				if err != nil {
 					sendFailCount++
-					rpc.Logger.Printf("report heart beat error:%s", err.Error())
+					rpc.Logger.Printf("report heartbeat error:%s", err.Error())
 
 					if sendFailCount > 2 {
 						manager.controlCenterClient.SendRetrySingle()
