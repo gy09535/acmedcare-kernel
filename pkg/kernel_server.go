@@ -88,7 +88,7 @@ func StartService() {
 		return
 	}
 
-	ShutDownService()
+	closeExistingService()
 	root := os.Getenv(ServiceRoot)
 	if strings.EqualFold(root, "") {
 		root = "/service"
@@ -124,7 +124,7 @@ func startRpc() {
 	}
 
 	if controlClient == nil {
-
+		rpc.Logger.Println("start service rpc error, now begin shutdown service")
 		rpc.Logger.Printf("control port is not connected:%s\r\n", ServicePort)
 		ShutDownService()
 		rpc.Logger.Fatalf("service start error\r\n")
@@ -162,6 +162,12 @@ func ShutDownService() {
 		centerClient.Close()
 	}
 
+	closeExistingService()
+}
+
+func closeExistingService() {
+
+	rpc.Logger.Println("begin close existing service")
 	root := os.Getenv(ServiceRoot)
 	if strings.EqualFold(root, "") {
 		root = "/service"
@@ -170,7 +176,6 @@ func ShutDownService() {
 	path := root + "/bin/shutdown.sh"
 	execShell(path, false)
 	isStart = false
-	rpc.Logger.Println("service is shutdown")
 }
 
 func execShell(path string, failClose bool) {
@@ -183,10 +188,10 @@ func execShell(path string, failClose bool) {
 	rpc.Logger.Println("service script msg:", out.String())
 	if err != nil {
 		if failClose {
-			rpc.Logger.Fatalf("start service error,%s\r\n", err.Error())
+			rpc.Logger.Fatalf("exec %s shell error,%s\r\n", path, err.Error())
 		} else {
 
-			rpc.Logger.Printf("start service error,%s\r\n", err.Error())
+			rpc.Logger.Printf("exec shell error,%s\r\n", err.Error())
 		}
 	}
 }
@@ -203,10 +208,10 @@ func receiveCommand(msg *string) {
 	switch serviceCommand.ServiceCommandType {
 
 	case entity.StartContext:
-		controlClient.StartContext()
+		err = controlClient.StartContext()
 		break
 	case entity.StopContext:
-		controlClient.StopContext()
+		err = controlClient.StopContext()
 		break
 	case entity.Start:
 		StartService()
@@ -217,6 +222,10 @@ func receiveCommand(msg *string) {
 	case entity.Restart:
 		ShutDownService()
 		StartService()
+	}
+
+	if err != nil {
+		rpc.Logger.Printf("control service error:%s", err.Error())
 	}
 }
 

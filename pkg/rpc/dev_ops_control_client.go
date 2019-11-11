@@ -15,18 +15,19 @@ type ControllerClient interface {
 	GetServiceInfo() (service *proto.ServiceDto, err error)
 	GetHeartBeat() (dto *proto.ResultDto, err error)
 	Close() error
+	SendRetrySingle()
 }
 
 type controllerClient struct {
 	conn         *grpc.ClientConn
-	RetryChannel chan int
+	retryChannel chan int
 	address      string
 }
 
 var Logger *log.Logger = nil
 
 func NewControllerClient(address string) ControllerClient {
-	conn, err := grpc.Dial(address, grpc.WithInsecure(), grpc.WithBlock())
+	conn, err := grpc.Dial(address, grpc.WithInsecure())
 	if err != nil {
 		log.Printf("did not connect control client: %s", err.Error())
 		return nil
@@ -89,14 +90,18 @@ func (client *controllerClient) retry() {
 
 	go func() {
 		for {
-			single := <-client.RetryChannel
+			single := <-client.retryChannel
 			if single == 1 {
 
+				Logger.Println("begin retry connection for control rpc")
 				if client.conn != nil {
-					_ := client.conn.Close()
+					err := client.conn.Close()
+					if err != nil {
+						Logger.Println("close control connection conn error:" + err.Error())
+					}
 				}
 
-				conn, err := grpc.Dial(client.address, grpc.WithInsecure(), grpc.WithBlock())
+				conn, err := grpc.Dial(client.address, grpc.WithInsecure())
 				if err != nil {
 					log.Printf("did not connect control client: %s", err.Error())
 					continue
@@ -110,8 +115,12 @@ func (client *controllerClient) retry() {
 	}()
 }
 
+func (client *controllerClient) SendRetrySingle() {
+	client.retryChannel <- 1
+}
+
 func (client *controllerClient) Close() error {
-	client.RetryChannel <- 2
+	client.retryChannel <- 2
 	return client.conn.Close()
 }
 

@@ -9,20 +9,21 @@ import (
 )
 
 type ControlCenterClient interface {
-	RegisterService(service proto.Service) (result proto.Result, err error)
-	ReportHeartBeat(beat proto.HeartBeat) (result proto.Result, err error)
+	RegisterService(service proto.Service) (result *proto.Result, err error)
+	ReportHeartBeat(beat proto.HeartBeat) (result *proto.Result, err error)
 	Close()
+	SendRetrySingle()
 }
 
 type controlCenterClient struct {
 	conn         *grpc.ClientConn
-	RetryChannel chan int
+	retryChannel chan int
 	address      string
 }
 
 func NewControlCenterClient(address string) ControlCenterClient {
 
-	conn, err := grpc.Dial(address, grpc.WithInsecure(), grpc.WithBlock())
+	conn, err := grpc.Dial(address, grpc.WithInsecure())
 	if err != nil {
 		log.Printf("did not connect control center: %v", err)
 		return nil
@@ -33,24 +34,28 @@ func NewControlCenterClient(address string) ControlCenterClient {
 	return client
 }
 
-func (client *controlCenterClient) ReportHeartBeat(beat proto.HeartBeat) (result proto.Result, err error) {
+func (client *controlCenterClient) ReportHeartBeat(beat proto.HeartBeat) (result *proto.Result, err error) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
 	r, err := client.getRpc().ReportHeartBeat(ctx, &beat)
-	return *r, err
+	return r, err
 }
 
 func (client *controlCenterClient) Close() {
-	_ := client.conn.Close()
+	client.retryChannel <- 2
+	err := client.conn.Close()
+	if err != nil {
+		Logger.Println("close control rpc error:" + err.Error())
+	}
 }
 
-func (client *controlCenterClient) RegisterService(service proto.Service) (result proto.Result, err error) {
+func (client *controlCenterClient) RegisterService(service proto.Service) (result *proto.Result, err error) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
 	r, err := client.getRpc().RegisterService(ctx, &service)
-	return *r, err
+	return r, err
 }
 
 func (client *controlCenterClient) getRpc() proto.ControllerCenterClient {
@@ -58,23 +63,34 @@ func (client *controlCenterClient) getRpc() proto.ControllerCenterClient {
 	return proto.NewControllerCenterClient(client.conn)
 }
 
+func (client *controlCenterClient) SendRetrySingle() {
+
+	client.retryChannel <- 1
+}
+
 func (client *controlCenterClient) retry() {
 
-	for {
-		single := <-client.RetryChannel
-		if single == 1 {
-			if client.conn != nil {
-				_ := client.conn.Close()
-			}
+	go func() {
+		for {
+			single := <-client.retryChannel
+			if single == 1 {
+				Logger.Println("begin retry connection for control center")
+				if client.conn != nil {
+					err := client.conn.Close()
+					if err != nil {
+						Logger.Println("close connection control error:" + err.Error())
+					}
+				}
 
-			conn, err := grpc.Dial(client.address, grpc.WithInsecure(), grpc.WithBlock())
-			if err != nil {
-				log.Printf("did not connect control center: %v", err)
-				continue
+				conn, err := grpc.Dial(client.address, grpc.WithInsecure())
+				if err != nil {
+					Logger.Printf("did not connect control center: %v", err)
+					continue
+				}
+				client.conn = conn
+			} else {
+				return
 			}
-			client.conn = conn
-		} else {
-			return
 		}
-	}
+	}()
 }

@@ -38,6 +38,8 @@ func (amqpClient *AmqpClient) Init(address string) (err error) {
 		for {
 			single := <-amqpClient.reConnChannel
 			if single == 1 {
+
+				rpc.Logger.Println("begin retry connection for rabbitmq")
 				conn, err1 := amqp.Dial(address)
 				if err1 != nil {
 					rpc.Logger.Println("retry connect rabbitmq error:" + err1.Error())
@@ -45,7 +47,10 @@ func (amqpClient *AmqpClient) Init(address string) (err error) {
 				}
 
 				if amqpClient.conn != nil && !amqpClient.conn.IsClosed() {
-					_ := amqpClient.conn.Close()
+					err := amqpClient.conn.Close()
+					if err != nil {
+						rpc.Logger.Println("close rabbitmq error:" + err.Error())
+					}
 				}
 
 				amqpClient.conn = conn
@@ -158,13 +163,14 @@ func (amqpClient *AmqpClient) Receive(topic, route string, queue string, reader 
 
 func (amqpClient *AmqpClient) Close() {
 
+	err := errors.New("")
 	if amqpClient.channel != nil {
-		amqpClient.channel.Close()
+		err = amqpClient.channel.Close()
 		amqpClient.channel = nil
 	}
 
 	if amqpClient.conn != nil {
-		amqpClient.conn.Close()
+		err = amqpClient.conn.Close()
 		amqpClient.conn = nil
 	}
 
@@ -174,6 +180,10 @@ func (amqpClient *AmqpClient) Close() {
 
 	if amqpClient.reConnChannel != nil {
 		amqpClient.reConnChannel <- 2
+	}
+
+	if err != nil {
+		rpc.Logger.Printf("close amqp client %s", err.Error())
 	}
 }
 
