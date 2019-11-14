@@ -33,7 +33,7 @@ var heartBeatManager *handler.HeartBeatManager = nil
 
 func Start() {
 
-	f, err := getLogger();
+	f, err := getLogger()
 	writers := []io.Writer{
 		f,
 		os.Stdout}

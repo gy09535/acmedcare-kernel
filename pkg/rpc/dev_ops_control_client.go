@@ -27,7 +27,7 @@ type controllerClient struct {
 var Logger *log.Logger = nil
 
 func NewControllerClient(address string) ControllerClient {
-	conn, err := grpc.Dial(address, grpc.WithInsecure())
+	conn, err := grpc.Dial(address, grpc.WithInsecure(),grpc.WithBlock())
 	if err != nil {
 		log.Printf("did not connect control client: %s", err.Error())
 		return nil
