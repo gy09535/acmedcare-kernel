@@ -20,8 +20,8 @@ type AmqpClient struct {
 
 func (amqpClient *AmqpClient) Init(address string) (err error) {
 
-	amqpClient.reConnChannel = make(chan int)
 	amqpClient.Close()
+	amqpClient.reConnChannel = make(chan int)
 	amqpClient.conn, err = amqp.Dial(address)
 	if err != nil {
 		return err
@@ -136,24 +136,45 @@ func (amqpClient *AmqpClient) Receive(topic, route string, queue string, reader 
 	}
 
 	go func() {
+
+		messages, err := amqpClient.channel.Consume(queue, "", true, false, false, false, nil)
+		if err != nil {
+			rpc.Logger.Printf("receive msg from control center error,%s\r\n", err.Error())
+			err = amqpClient.Ping()
+			if err != nil {
+				rpc.Logger.Println("ping rabbitmq error:" + err.Error())
+				amqpClient.reConnChannel <- 1
+			}
+		}
+
+		retry := false
 		for {
+
 			select {
-			case <-time.After(time.Second * 10):
-				messages, err := amqpClient.channel.Consume(queue, "", true, false, false, false, nil)
-				if err != nil {
-					rpc.Logger.Printf("receive msg from control center error,%s\r\n", err.Error())
-					err = amqpClient.Ping()
+			case d := <-messages:
+				s := bytesToString(&(d.Body))
+				reader(s)
+				break
+			case <-time.After(time.Minute):
+
+				if retry {
+					messages, err = amqpClient.channel.Consume(queue, "", true, false, false, false, nil)
 					if err != nil {
-						rpc.Logger.Println("ping rabbitmq error:" + err.Error())
+						rpc.Logger.Printf("receive msg from control center error,%s\r\n", err.Error())
 						amqpClient.reConnChannel <- 1
+						break
 					}
 				}
 
-				for d := range messages {
-					s := bytesToString(&(d.Body))
-					reader(s)
+				err = amqpClient.Ping()
+				if err != nil {
+					rpc.Logger.Println("ping rabbitmq error:" + err.Error())
+					amqpClient.reConnChannel <- 1
+					retry = true
+				} else {
+					rpc.Logger.Println("ping rabbitmq success")
+					retry = false
 				}
-				break
 			case <-amqpClient.receiveChannel:
 				return
 			}

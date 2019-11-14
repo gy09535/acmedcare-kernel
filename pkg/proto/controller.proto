@@ -29,5 +29,5 @@ message ResultDto {
 message ServiceDto {
     string name=1;
     string ip=2;
-    string por=3;
+    string port=3;
 }

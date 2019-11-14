@@ -75,7 +75,7 @@ func startAmqp() {
 		rpc.Logger.Fatalf("get service error,%s\r\n", err.Error())
 	}
 
-	route := TopicName + "." + serviceInfo.GetName() + "." + serviceInfo.GetIp();
+	route := TopicName + "." + serviceInfo.GetName() + "." + serviceInfo.GetIp() + ":" + serviceInfo.GetPort()
 	// receive command from server
 	amqpClient.Receive(TopicName, route, route, receiveCommand)
 	rpc.Logger.Printf("amqp is started")

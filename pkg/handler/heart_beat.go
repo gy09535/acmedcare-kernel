@@ -23,18 +23,20 @@ func (manager *HeartBeatManager) Monitor() {
 
 	serviceInfo, err := manager.controlClient.GetServiceInfo()
 	if err != nil {
-		rpc.Logger.Println("get service info error:" + err.Error())
+		rpc.Logger.Fatalf("get service info error:" + err.Error())
 	}
 
 	if serviceInfo != nil {
 		manager.heartBeat.ServiceName = serviceInfo.Name
 		manager.heartBeat.Ip = serviceInfo.Ip
-		service := proto.Service{Name: serviceInfo.Name, Ip: serviceInfo.Ip, Port: serviceInfo.Por}
+		manager.heartBeat.Port = serviceInfo.Port
+		manager.heartBeat.CurrentTime = 0
+		service := proto.Service{Name: serviceInfo.Name, Ip: serviceInfo.Ip, Port: serviceInfo.Port}
 		_, err = manager.controlCenterClient.RegisterService(service)
 	}
 
 	if err != nil {
-		rpc.Logger.Println("get service error:" + err.Error())
+		rpc.Logger.Fatalf("register service error:" + err.Error())
 	}
 
 	go func() {
@@ -54,7 +56,7 @@ func (manager *HeartBeatManager) Monitor() {
 						manager.controlClient.SendRetrySingle()
 						sendFailCount = 0
 					}
-					continue
+					break
 				}
 
 				sendFailCount = 0
@@ -80,8 +82,8 @@ func (manager *HeartBeatManager) StartReport() {
 			select {
 			case <-time.After(time.Minute):
 				rpc.Logger.Println("report heartbeat from service:" + manager.heartBeat.ServiceName + " to control center")
-				service, err := manager.controlClient.GetServiceInfo()
-				_, err = manager.controlCenterClient.ReportHeartBeat(manager.heartBeat)
+				_, err := manager.controlCenterClient.ReportHeartBeat(manager.heartBeat)
+
 				if err != nil {
 					sendFailCount++
 					rpc.Logger.Printf("report heartbeat error:%s", err.Error())
@@ -90,15 +92,12 @@ func (manager *HeartBeatManager) StartReport() {
 						manager.controlCenterClient.SendRetrySingle()
 						sendFailCount = 0
 					}
-					continue
+					break
 				}
-
 				sendFailCount = 0
 				manager.heartBeat.SuccessCount = 0
 				manager.heartBeat.FailCount = 0
-				manager.heartBeat.ServiceName = service.Name
-				manager.heartBeat.Ip = service.Ip
-				manager.heartBeat.CurrentTime = time.Now().Unix()
+				manager.heartBeat.CurrentTime = 0
 				break
 			case <-manager.reportChannel:
 				return

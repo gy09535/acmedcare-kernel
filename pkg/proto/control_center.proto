@@ -21,6 +21,7 @@ message HeartBeat{
     int32 failCount=3;
     string ip=4;
     int64 currentTime=5;
+    string port=6;
 }
 
 message Result {
