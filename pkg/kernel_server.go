@@ -208,24 +208,32 @@ func receiveCommand(msg *string) {
 	switch serviceCommand.ServiceCommandType {
 
 	case entity.StartContext:
+		rpc.Logger.Println("begin start context for service:" + serviceCommand.ServiceName)
 		err = controlClient.StartContext()
 		break
 	case entity.StopContext:
+		rpc.Logger.Println("begin stop context for service:" + serviceCommand.ServiceName)
 		err = controlClient.StopContext()
 		break
 	case entity.Start:
+		rpc.Logger.Println("begin start for service:" + serviceCommand.ServiceName)
 		StartService()
-
+		break
 	case entity.Stop:
+		rpc.Logger.Println("begin stop for service:" + serviceCommand.ServiceName)
 		ShutDownService()
-
+		break
 	case entity.Restart:
+		rpc.Logger.Println("begin restart for service:" + serviceCommand.ServiceName)
 		ShutDownService()
 		StartService()
+		break
 	}
 
 	if err != nil {
-		rpc.Logger.Printf("control service error:%s", err.Error())
+		rpc.Logger.Printf("command exec fail error:%s", err.Error())
+	} else {
+		rpc.Logger.Println("command exec finish")
 	}
 }
 
