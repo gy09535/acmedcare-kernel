@@ -183,7 +183,7 @@ func execShell(path string, failClose bool) {
 	var out bytes.Buffer
 
 	cmd.Stdout = &out
-	err := cmd.Run()
+	err := cmd.Start()
 
 	rpc.Logger.Println("service script msg:", out.String())
 	if err != nil {
